@@ -14,7 +14,104 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      analysis: {
+        Row: {
+          angry: number
+          created_at: string
+          frustrated: number
+          happy: number
+          id: string
+          neutral: number
+          suggestions: string | null
+          summary: string | null
+          upload_id: string
+          user_id: string
+        }
+        Insert: {
+          angry?: number
+          created_at?: string
+          frustrated?: number
+          happy?: number
+          id?: string
+          neutral?: number
+          suggestions?: string | null
+          summary?: string | null
+          upload_id: string
+          user_id: string
+        }
+        Update: {
+          angry?: number
+          created_at?: string
+          frustrated?: number
+          happy?: number
+          id?: string
+          neutral?: number
+          suggestions?: string | null
+          summary?: string | null
+          upload_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      uploads: {
+        Row: {
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          mime_type: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          file_name: string
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
