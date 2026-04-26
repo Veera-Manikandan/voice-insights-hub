@@ -30,9 +30,9 @@ export function Header() {
               </span>
               <Button
                 variant="glass"
-                onClick={() => {
-                  logout();
-                  navigate({ to: "/" });
+                onClick={async () => {
+                  await logout();
+                  navigate({ to: "/login" });
                 }}
               >
                 Sign Out
