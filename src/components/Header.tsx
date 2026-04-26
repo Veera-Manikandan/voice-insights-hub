@@ -26,7 +26,7 @@ export function Header() {
           {isAuthenticated ? (
             <>
               <span className="hidden text-sm text-muted-foreground sm:inline">
-                {user?.fullName}
+                {user?.email}
               </span>
               <Button
                 variant="glass"
