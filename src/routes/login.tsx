@@ -44,7 +44,7 @@ function LoginPage() {
   const onSubmit = async (values: FormValues) => {
     try {
       await login(values.email, values.password);
-      toast.success("Welcome back!");
+      toast.success("Login Successful");
       navigate({ to: "/dashboard" });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Login failed");
