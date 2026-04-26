@@ -98,8 +98,6 @@ function DashboardPage() {
   }
 
   async function handleFile(file: File) {
-    if (!user) return;
-
     const lower = file.name.toLowerCase();
     const okExt = ACCEPTED_EXT.some((e) => lower.endsWith(e));
     const okMime = !file.type || ACCEPTED.includes(file.type);
@@ -110,23 +108,38 @@ function DashboardPage() {
 
     setUploading(true);
     try {
-      const path = `${user.id}/${Date.now()}-${file.name.replace(/[^\w.-]+/g, "_")}`;
+      // 1. Get the current authenticated user
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !userData.user) {
+        toast.error("You must be logged in to upload");
+        navigate({ to: "/login" });
+        return;
+      }
+      const authUser = userData.user;
+
+      // 2. Upload file to Supabase storage (call-recordings bucket)
+      const path = `${authUser.id}/${Date.now()}-${file.name.replace(/[^\w.-]+/g, "_")}`;
       const { error: upErr } = await supabase.storage
         .from("call-recordings")
         .upload(path, file, { contentType: file.type || undefined, upsert: false });
       if (upErr) throw upErr;
 
+      // 3. Insert row into uploads table immediately after upload
       const { error: insErr, data: inserted } = await supabase
         .from("uploads")
         .insert({
-          user_id: user.id,
+          user_id: authUser.id,
           file_url: path,
           file_name: file.name,
           mime_type: file.type || null,
         })
         .select()
         .single();
-      if (insErr) throw insErr;
+      if (insErr) {
+        // Roll back the storage upload if the DB insert failed
+        await supabase.storage.from("call-recordings").remove([path]);
+        throw insErr;
+      }
 
       toast.success("Audio uploaded successfully");
       setUploads((prev) => [inserted as UploadRow, ...prev]);
