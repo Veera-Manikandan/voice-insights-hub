@@ -1,86 +1,85 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import type { Session, User as SupabaseUser } from "@supabase/supabase-js";
+import { supabase } from "@/integrations/supabase/client";
 
 interface User {
+  id: string;
   fullName: string;
   email: string;
 }
 
-interface StoredUser extends User {
-  password: string;
-}
-
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   isAuthenticated: boolean;
   loading: boolean;
   signup: (fullName: string, email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const USERS_KEY = "voxpulse_users";
-const SESSION_KEY = "voxpulse_session";
-
-function getUsers(): StoredUser[] {
-  if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(USERS_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function saveUsers(users: StoredUser[]) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+function toUser(su: SupabaseUser | null | undefined): User | null {
+  if (!su) return null;
+  const meta = (su.user_metadata ?? {}) as Record<string, unknown>;
+  const fullName =
+    (meta.full_name as string) ||
+    (meta.fullName as string) ||
+    (su.email ? su.email.split("@")[0] : "") ||
+    "";
+  return { id: su.id, email: su.email ?? "", fullName };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const session = localStorage.getItem(SESSION_KEY);
-      if (session) setUser(JSON.parse(session));
-    } catch {
-      // ignore
-    }
-    setLoading(false);
+    // Set up listener BEFORE getSession
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      setUser(toUser(newSession?.user));
+    });
+
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setUser(toUser(data.session?.user));
+      setLoading(false);
+    });
+
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   const signup = async (fullName: string, email: string, password: string) => {
-    const users = getUsers();
-    if (users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
-      throw new Error("An account with this email already exists.");
-    }
-    const newUser: StoredUser = { fullName, email, password };
-    saveUsers([...users, newUser]);
-    const sessionUser: User = { fullName, email };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-    setUser(sessionUser);
+    const redirectUrl =
+      typeof window !== "undefined" ? `${window.location.origin}/dashboard` : undefined;
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName },
+        emailRedirectTo: redirectUrl,
+      },
+    });
+    if (error) throw new Error(error.message);
   };
 
   const login = async (email: string, password: string) => {
-    const users = getUsers();
-    const found = users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    if (!found) throw new Error("Invalid email or password.");
-    const sessionUser: User = { fullName: found.fullName, email: found.email };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-    setUser(sessionUser);
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
   };
 
-  const logout = () => {
-    localStorage.removeItem(SESSION_KEY);
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
   };
 
   return (
     <AuthContext.Provider
-      value={{ user, isAuthenticated: !!user, loading, signup, login, logout }}
+      value={{ user, session, isAuthenticated: !!user, loading, signup, login, logout }}
     >
       {children}
     </AuthContext.Provider>
